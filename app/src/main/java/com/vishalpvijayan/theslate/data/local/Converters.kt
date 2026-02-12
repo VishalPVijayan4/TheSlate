@@ -3,6 +3,8 @@ package com.vishalpvijayan.theslate.data.local
 import com.vishalpvijayan.theslate.domain.model.ChecklistItem
 import com.vishalpvijayan.theslate.domain.model.Note
 import com.vishalpvijayan.theslate.domain.model.TableCell
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 object NoteMappers {
