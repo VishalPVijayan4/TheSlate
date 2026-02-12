@@ -28,6 +28,7 @@ data class Note(
     val drawingImagePath: String? = null,
     val checklistItems: List<ChecklistItem> = emptyList(),
     val tableData: List<TableCell> = emptyList(),
+    val tags: List<String> = emptyList(),
     val alarmTime: Long? = null,
     val isSynced: Boolean = false,
     val userId: String = "local_user"

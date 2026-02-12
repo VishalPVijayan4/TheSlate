@@ -25,7 +25,9 @@ object AppProvidesModule {
     @Provides
     @Singleton
     fun provideDb(@ApplicationContext context: Context): TheSlateDatabase =
-        Room.databaseBuilder(context, TheSlateDatabase::class.java, "theslate.db").build()
+        Room.databaseBuilder(context, TheSlateDatabase::class.java, "theslate.db")
+            .fallbackToDestructiveMigration()
+            .build()
 
     @Provides fun provideNoteDao(db: TheSlateDatabase): NoteDao = db.noteDao()
     @Provides fun provideChecklistDao(db: TheSlateDatabase): ChecklistDao = db.checklistDao()
