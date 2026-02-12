@@ -1,11 +1,21 @@
 package com.vishalpvijayan.theslate.ui.screens
 
+import android.Manifest
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Color
+import android.graphics.Paint
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -41,6 +51,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -48,12 +59,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.vishalpvijayan.theslate.core.AudioRecorder
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.io.File
+import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -83,9 +102,7 @@ fun OnboardingScreen(onProceed: () -> Unit) {
 
     LaunchedEffect(pagerState.currentPage) {
         delay(3000)
-        if (pagerState.currentPage < pages.lastIndex) {
-            pagerState.animateScrollToPage(pagerState.currentPage + 1)
-        }
+        if (pagerState.currentPage < pages.lastIndex) pagerState.animateScrollToPage(pagerState.currentPage + 1)
     }
 
     Column(Modifier.fillMaxSize().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -101,24 +118,14 @@ fun OnboardingScreen(onProceed: () -> Unit) {
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             pages.indices.forEach { idx ->
-                Spacer(
-                    Modifier.size(10.dp).clip(CircleShape)
-                        .background(if (pagerState.currentPage == idx) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline)
-                )
+                Spacer(Modifier.size(10.dp).clip(CircleShape).background(if (pagerState.currentPage == idx) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline))
             }
         }
         Spacer(Modifier.height(16.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Button(onClick = {
-                scope.launch { pagerState.animateScrollToPage((pagerState.currentPage - 1).coerceAtLeast(0)) }
-            }, enabled = pagerState.currentPage > 0) { Text("Previous") }
-            if (pagerState.currentPage == pages.lastIndex) {
-                Button(onClick = onProceed) { Text("Proceed to Login") }
-            } else {
-                Button(onClick = {
-                    scope.launch { pagerState.animateScrollToPage((pagerState.currentPage + 1).coerceAtMost(pages.lastIndex)) }
-                }) { Text("Next") }
-            }
+            Button(onClick = { scope.launch { pagerState.animateScrollToPage((pagerState.currentPage - 1).coerceAtLeast(0)) } }, enabled = pagerState.currentPage > 0) { Text("Previous") }
+            if (pagerState.currentPage == pages.lastIndex) Button(onClick = onProceed) { Text("Proceed to Login") }
+            else Button(onClick = { scope.launch { pagerState.animateScrollToPage((pagerState.currentPage + 1).coerceAtMost(pages.lastIndex)) } }) { Text("Next") }
         }
     }
 }
@@ -138,18 +145,11 @@ fun LoginScreen(onGoogleSignIn: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DashboardScreen(
-    viewModel: DashboardViewModel,
-    onOpenNote: (String) -> Unit,
-    onCreate: () -> Unit,
-    onSignedOut: () -> Unit
-) {
+fun DashboardScreen(viewModel: DashboardViewModel, onOpenNote: (String) -> Unit, onCreate: () -> Unit, onSignedOut: () -> Unit) {
     val state by viewModel.uiState.collectAsState()
     val now = remember { SimpleDateFormat("EEE, dd MMM yyyy HH:mm", Locale.getDefault()).format(Date()) }
 
-    Scaffold(
-        floatingActionButton = { FloatingActionButton(onClick = onCreate) { Icon(Icons.Default.Add, null) } }
-    ) { padding ->
+    Scaffold(floatingActionButton = { FloatingActionButton(onClick = onCreate) { Icon(Icons.Default.Add, null) } }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
             val hour = remember { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
             val greet = when (hour) { in 0..11 -> "Good Morning"; in 12..16 -> "Good Afternoon"; else -> "Good Evening" }
@@ -165,15 +165,10 @@ fun DashboardScreen(
                 OutlinedTextField(value = state.searchQuery, onValueChange = viewModel::onSearch, label = { Text("Search notes") }, modifier = Modifier.fillMaxWidth())
             }
             Spacer(Modifier.height(8.dp))
-            if (state.notes.isEmpty()) {
-                Text("No notes yet. Start creating.")
-            } else {
+            if (state.notes.isEmpty()) Text("No notes yet. Start creating.") else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(state.notes) { note ->
-                        Card(
-                            modifier = Modifier.fillMaxWidth().clickable { onOpenNote(note.noteId) },
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                        ) {
+                        Card(modifier = Modifier.fillMaxWidth().clickable { onOpenNote(note.noteId) }, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                             Column(Modifier.padding(12.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(note.title.ifBlank { "Untitled" }, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
@@ -196,9 +191,36 @@ fun DashboardScreen(
 fun NoteEditorScreen(viewModel: NoteEditorViewModel, onBack: () -> Unit) {
     val note by viewModel.note.collectAsState()
     val mode by viewModel.mode.collectAsState()
-    var imageInput by remember { mutableStateOf("") }
-    var audioInput by remember { mutableStateOf("") }
+    val context = LocalContext.current
+
     var checklistInput by remember { mutableStateOf("") }
+    var isRecording by remember { mutableStateOf(false) }
+    var recordingPath by remember { mutableStateOf<String?>(null) }
+    val recorder = remember { AudioRecorder(context) }
+
+    val strokes = remember { mutableStateListOf<MutableList<Offset>>() }
+    var currentStroke by remember { mutableStateOf<MutableList<Offset>?>(null) }
+
+    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let { viewModel.addImage(it.toString()) }
+    }
+
+    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
+        bitmap?.let {
+            saveBitmap(context, it)?.let(viewModel::addImage)
+        }
+    }
+
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) cameraLauncher.launch(null)
+    }
+    val audioPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted && !isRecording) {
+            recordingPath = recorder.start()
+            isRecording = true
+        }
+    }
 
     Scaffold { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -206,27 +228,24 @@ fun NoteEditorScreen(viewModel: NoteEditorViewModel, onBack: () -> Unit) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("${mode.name} Note", style = MaterialTheme.typography.titleLarge)
                     Row {
-                        if (mode == NoteMode.VIEW) {
-                            IconButton(onClick = { viewModel.setMode(NoteMode.EDIT) }) { Icon(Icons.Default.Edit, null) }
-                        }
+                        if (mode == NoteMode.VIEW) IconButton(onClick = { viewModel.setMode(NoteMode.EDIT) }) { Icon(Icons.Default.Edit, null) }
                         IconButton(onClick = { viewModel.delete(onBack) }) { Icon(Icons.Default.Delete, null) }
                     }
                 }
             }
-            item {
-                OutlinedTextField(value = note.title, onValueChange = viewModel::updateTitle, enabled = mode != NoteMode.VIEW, label = { Text("Title") }, modifier = Modifier.fillMaxWidth())
-            }
-            item {
-                OutlinedTextField(value = note.description, onValueChange = viewModel::updateDescription, enabled = mode != NoteMode.VIEW, label = { Text("Description") }, modifier = Modifier.fillMaxWidth())
-            }
+            item { OutlinedTextField(value = note.title, onValueChange = viewModel::updateTitle, enabled = mode != NoteMode.VIEW, label = { Text("Title") }, modifier = Modifier.fillMaxWidth()) }
+            item { OutlinedTextField(value = note.description, onValueChange = viewModel::updateDescription, enabled = mode != NoteMode.VIEW, label = { Text("Description") }, modifier = Modifier.fillMaxWidth()) }
+
             item { Text("Images (${note.imageAttachments.size}/5)") }
             items(note.imageAttachments) { path ->
                 AsyncImage(model = Uri.parse(path), contentDescription = null, modifier = Modifier.fillMaxWidth().height(180.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
             }
             if (mode != NoteMode.VIEW) {
                 item {
-                    OutlinedTextField(value = imageInput, onValueChange = { imageInput = it }, label = { Text("Image URI/path") }, modifier = Modifier.fillMaxWidth())
-                    Button(onClick = { viewModel.addImage(imageInput); imageInput = "" }) { Text("Add Image") }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = { galleryLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) { Text("Gallery") }
+                        Button(onClick = { cameraPermissionLauncher.launch(Manifest.permission.CAMERA) }) { Text("Take Photo") }
+                    }
                 }
             }
 
@@ -234,8 +253,18 @@ fun NoteEditorScreen(viewModel: NoteEditorViewModel, onBack: () -> Unit) {
             items(note.audioAttachments) { audio -> Text("• $audio") }
             if (mode != NoteMode.VIEW) {
                 item {
-                    OutlinedTextField(value = audioInput, onValueChange = { audioInput = it }, label = { Text("Audio URI/path") }, modifier = Modifier.fillMaxWidth())
-                    Button(onClick = { viewModel.addAudio(audioInput); audioInput = "" }) { Text("Add Audio") }
+                    Button(onClick = {
+                        if (!isRecording) {
+                            audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                        } else {
+                            recorder.stop()
+                            recordingPath?.let(viewModel::addAudio)
+                            recordingPath = null
+                            isRecording = false
+                        }
+                    }) {
+                        Text(if (isRecording) "Stop & Save Recording" else "Record Audio")
+                    }
                 }
             }
 
@@ -243,7 +272,41 @@ fun NoteEditorScreen(viewModel: NoteEditorViewModel, onBack: () -> Unit) {
                 Text("Drawing")
                 Text(note.drawingImagePath ?: "No drawing saved")
                 if (mode != NoteMode.VIEW) {
-                    Button(onClick = { viewModel.setDrawing("drawing_${note.noteId}.png") }) { Text("Save Sample Drawing") }
+                    Box(
+                        modifier = Modifier.fillMaxWidth().height(260.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(androidx.compose.ui.graphics.Color.White)
+                    ) {
+                        Canvas(
+                            modifier = Modifier.fillMaxSize().pointerInput(Unit) {
+                                detectDragGestures(
+                                    onDragStart = {
+                                        currentStroke = mutableListOf(it)
+                                        strokes.add(currentStroke!!)
+                                    },
+                                    onDrag = { change, _ ->
+                                        currentStroke?.add(change.position)
+                                    }
+                                )
+                            }
+                        ) {
+                            strokes.forEach { stroke ->
+                                if (stroke.size > 1) {
+                                    val path = Path().apply {
+                                        moveTo(stroke.first().x, stroke.first().y)
+                                        stroke.drop(1).forEach { lineTo(it.x, it.y) }
+                                    }
+                                    drawPath(path, color = androidx.compose.ui.graphics.Color.Black, style = Stroke(width = 4f))
+                                }
+                            }
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = { strokes.clear() }) { Text("Clear") }
+                        Button(onClick = {
+                            saveDrawing(context, strokes)?.let(viewModel::setDrawing)
+                        }) { Text("Save Drawing") }
+                    }
                 }
             }
 
@@ -266,19 +329,11 @@ fun NoteEditorScreen(viewModel: NoteEditorViewModel, onBack: () -> Unit) {
                 note.tableData.groupBy { it.row }.toSortedMap().forEach { (_, rowCells) ->
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         rowCells.sortedBy { it.column }.forEach { cell ->
-                            OutlinedTextField(
-                                value = cell.value,
-                                onValueChange = { viewModel.updateCell(cell.row, cell.column, it) },
-                                enabled = mode != NoteMode.VIEW,
-                                label = { Text("${cell.row},${cell.column}") },
-                                modifier = Modifier.weight(1f)
-                            )
+                            OutlinedTextField(value = cell.value, onValueChange = { viewModel.updateCell(cell.row, cell.column, it) }, enabled = mode != NoteMode.VIEW, label = { Text("${cell.row},${cell.column}") }, modifier = Modifier.weight(1f))
                         }
                     }
                 }
-                if (mode != NoteMode.VIEW) {
-                    Button(onClick = { viewModel.addTableRow(2) }) { Text("Add Row") }
-                }
+                if (mode != NoteMode.VIEW) Button(onClick = { viewModel.addTableRow(2) }) { Text("Add Row") }
             }
 
             item {
@@ -289,11 +344,39 @@ fun NoteEditorScreen(viewModel: NoteEditorViewModel, onBack: () -> Unit) {
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Button(onClick = onBack) { Text("Back") }
-                    if (mode != NoteMode.VIEW) {
-                        Button(onClick = { viewModel.save(onBack) }) { Icon(Icons.Default.Check, null); Text("Save") }
-                    }
+                    if (mode != NoteMode.VIEW) Button(onClick = { viewModel.save(onBack) }) { Icon(Icons.Default.Check, null); Text("Save") }
                 }
             }
         }
     }
 }
+
+private fun saveBitmap(context: Context, bitmap: Bitmap): String? = runCatching {
+    val file = File(context.cacheDir, "img_${System.currentTimeMillis()}.jpg")
+    FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+    file.absolutePath
+}.getOrNull()
+
+private fun saveDrawing(context: Context, strokes: List<List<Offset>>): String? = runCatching {
+    val width = 1200
+    val height = 800
+    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    val canvas = android.graphics.Canvas(bitmap)
+    canvas.drawColor(Color.WHITE)
+    val paint = Paint().apply {
+        color = Color.BLACK
+        strokeWidth = 6f
+        style = Paint.Style.STROKE
+        isAntiAlias = true
+    }
+    strokes.forEach { stroke ->
+        if (stroke.size > 1) {
+            for (i in 0 until stroke.size - 1) {
+                val from = stroke[i]
+                val to = stroke[i + 1]
+                canvas.drawLine(from.x, from.y, to.x, to.y, paint)
+            }
+        }
+    }
+    saveBitmap(context, bitmap)
+}.getOrNull()
