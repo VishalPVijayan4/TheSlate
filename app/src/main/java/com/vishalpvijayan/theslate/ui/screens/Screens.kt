@@ -803,6 +803,8 @@ fun NoteEditorScreen(viewModel: NoteEditorViewModel, onBack: () -> Unit) {
                                         }
                                     }
                                 }
+                            }) {
+                                Text(if (isRecording) "Stop & Save Recording" else "Record Audio")
                             }
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Button(onClick = { strokes.clear() }) { Text("Clear") }
