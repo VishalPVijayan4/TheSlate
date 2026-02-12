@@ -35,8 +35,7 @@ fun TheSlateNavGraph() {
         }
         composable("login") {
             val vm: LoginViewModel = hiltViewModel()
-            LoginScreen(onGoogleSignIn = {
-                vm.loginAsDemo()
+            LoginScreen(viewModel = vm, onLoginSuccess = {
                 navController.navigate("dashboard") { popUpTo("login") { inclusive = true } }
             })
         }

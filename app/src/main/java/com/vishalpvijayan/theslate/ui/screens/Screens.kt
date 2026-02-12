@@ -48,6 +48,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -68,6 +69,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.ConnectionResult
+import com.google.android.gms.common.GoogleApiAvailability
+import com.vishalpvijayan.theslate.core.AudioPlayerManager
 import com.vishalpvijayan.theslate.core.AudioRecorder
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -131,15 +137,53 @@ fun OnboardingScreen(onProceed: () -> Unit) {
 }
 
 @Composable
-fun LoginScreen(onGoogleSignIn: () -> Unit) {
+fun LoginScreen(viewModel: LoginViewModel, onLoginSuccess: () -> Unit) {
+    val context = LocalContext.current
+    val webClientId = ""
+    val hasPlayServices = remember {
+        GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(context) == ConnectionResult.SUCCESS
+    }
+
+    val gso = remember {
+        GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestEmail()
+            .build()
+    }
+    val signInClient = remember { GoogleSignIn.getClient(context, gso) }
+
+    val signInLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val accountTask = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+        if (accountTask.isSuccessful) {
+            val account = accountTask.result
+            if (account != null) {
+                viewModel.onGoogleSignedIn(
+                    userName = account.displayName.orEmpty(),
+                    email = account.email.orEmpty(),
+                    photoUrl = account.photoUrl?.toString().orEmpty(),
+                    id = account.id.orEmpty()
+                )
+                onLoginSuccess()
+            }
+        }
+    }
+
     Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
         Text("Login", style = MaterialTheme.typography.headlineLarge)
-        Spacer(Modifier.height(16.dp))
-        Text("Google Sign-In wiring is intentionally kept simple so you can plug in your own Google flow.")
+        Spacer(Modifier.height(12.dp))
+        if (!hasPlayServices) {
+            Text("Google Play Services unavailable on this device.")
+        }
+        if (webClientId.isBlank()) {
+            Text("Google Sign-In API check: add your Web Client ID and scope config for production.")
+        }
         Spacer(Modifier.height(20.dp))
-        Button(onClick = onGoogleSignIn, modifier = Modifier.fillMaxWidth()) { Text("Sign in with Google") }
+        Button(
+            onClick = { signInLauncher.launch(signInClient.signInIntent) },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = hasPlayServices
+        ) { Text("Sign in with Google") }
         Spacer(Modifier.height(8.dp))
-        Button(onClick = onGoogleSignIn, modifier = Modifier.fillMaxWidth()) { Text("Sign up with Google") }
+        Button(onClick = { viewModel.loginAsDemo(); onLoginSuccess() }, modifier = Modifier.fillMaxWidth()) { Text("Continue Demo") }
     }
 }
 
@@ -165,9 +209,11 @@ fun DashboardScreen(viewModel: DashboardViewModel, onOpenNote: (String) -> Unit,
                 OutlinedTextField(value = state.searchQuery, onValueChange = viewModel::onSearch, label = { Text("Search notes") }, modifier = Modifier.fillMaxWidth())
             }
             Spacer(Modifier.height(8.dp))
-            if (state.notes.isEmpty()) Text("No notes yet. Start creating.") else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(state.notes) { note ->
+            if (state.notes.isEmpty()) {
+                Text("No notes yet. Start creating.")
+            } else {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
+                    items(state.visibleNotes) { note ->
                         Card(modifier = Modifier.fillMaxWidth().clickable { onOpenNote(note.noteId) }, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                             Column(Modifier.padding(12.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -177,6 +223,11 @@ fun DashboardScreen(viewModel: DashboardViewModel, onOpenNote: (String) -> Unit,
                                 Text(note.description.take(80))
                                 Text("Edited: ${SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()).format(Date(note.updatedAt))}")
                             }
+                        }
+                    }
+                    if (state.hasMore) {
+                        item {
+                            Button(onClick = viewModel::loadNextPage, modifier = Modifier.fillMaxWidth()) { Text("Load more") }
                         }
                     }
                 }
@@ -192,6 +243,7 @@ fun NoteEditorScreen(viewModel: NoteEditorViewModel, onBack: () -> Unit) {
     val note by viewModel.note.collectAsState()
     val mode by viewModel.mode.collectAsState()
     val context = LocalContext.current
+    val player = remember { AudioPlayerManager(context) }
 
     var checklistInput by remember { mutableStateOf("") }
     var isRecording by remember { mutableStateOf(false) }
@@ -204,14 +256,9 @@ fun NoteEditorScreen(viewModel: NoteEditorViewModel, onBack: () -> Unit) {
     val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         uri?.let { viewModel.addImage(it.toString()) }
     }
-
     val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
-        bitmap?.let {
-            saveBitmap(context, it)?.let(viewModel::addImage)
-        }
+        bitmap?.let { saveBitmap(context, it)?.let(viewModel::addImage) }
     }
-
-
     val cameraPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) cameraLauncher.launch(null)
     }
@@ -221,6 +268,8 @@ fun NoteEditorScreen(viewModel: NoteEditorViewModel, onBack: () -> Unit) {
             isRecording = true
         }
     }
+
+    DisposableEffect(Unit) { onDispose { player.release() } }
 
     Scaffold { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -250,7 +299,15 @@ fun NoteEditorScreen(viewModel: NoteEditorViewModel, onBack: () -> Unit) {
             }
 
             item { Text("Audio (${note.audioAttachments.size}/2)") }
-            items(note.audioAttachments) { audio -> Text("• $audio") }
+            items(note.audioAttachments) { audio ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text(text = audio.substringAfterLast('/'), modifier = Modifier.weight(1f))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = { player.play(audio) }) { Text("Play") }
+                        Button(onClick = { player.stop() }) { Text("Stop") }
+                    }
+                }
+            }
             if (mode != NoteMode.VIEW) {
                 item {
                     Button(onClick = {
@@ -277,19 +334,12 @@ fun NoteEditorScreen(viewModel: NoteEditorViewModel, onBack: () -> Unit) {
                             .clip(RoundedCornerShape(8.dp))
                             .background(androidx.compose.ui.graphics.Color.White)
                     ) {
-                        Canvas(
-                            modifier = Modifier.fillMaxSize().pointerInput(Unit) {
-                                detectDragGestures(
-                                    onDragStart = {
-                                        currentStroke = mutableListOf(it)
-                                        strokes.add(currentStroke!!)
-                                    },
-                                    onDrag = { change, _ ->
-                                        currentStroke?.add(change.position)
-                                    }
-                                )
-                            }
-                        ) {
+                        Canvas(modifier = Modifier.fillMaxSize().pointerInput(Unit) {
+                            detectDragGestures(
+                                onDragStart = { start -> currentStroke = mutableListOf(start).also(strokes::add) },
+                                onDrag = { change, _ -> currentStroke?.add(change.position) }
+                            )
+                        }) {
                             strokes.forEach { stroke ->
                                 if (stroke.size > 1) {
                                     val path = Path().apply {
@@ -303,9 +353,7 @@ fun NoteEditorScreen(viewModel: NoteEditorViewModel, onBack: () -> Unit) {
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(onClick = { strokes.clear() }) { Text("Clear") }
-                        Button(onClick = {
-                            saveDrawing(context, strokes)?.let(viewModel::setDrawing)
-                        }) { Text("Save Drawing") }
+                        Button(onClick = { saveDrawing(context, strokes)?.let(viewModel::setDrawing) }) { Text("Save Drawing") }
                     }
                 }
             }

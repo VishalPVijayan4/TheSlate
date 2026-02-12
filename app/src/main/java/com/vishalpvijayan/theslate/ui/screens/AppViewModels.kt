@@ -23,7 +23,10 @@ enum class NoteMode { CREATE, VIEW, EDIT }
 data class DashboardUiState(
     val session: UserSession = UserSession(),
     val searchQuery: String = "",
-    val notes: List<Note> = emptyList()
+    val notes: List<Note> = emptyList(),
+    val visibleNotes: List<Note> = emptyList(),
+    val page: Int = 1,
+    val hasMore: Boolean = false
 )
 
 @HiltViewModel
@@ -38,25 +41,53 @@ class LoginViewModel @Inject constructor(private val useCases: NoteUseCases) : V
             useCases.saveSession(UserSession("local_user", "Demo User", "demo@theslate.app", "", true))
         }
     }
+
+    fun onGoogleSignedIn(userName: String, email: String, photoUrl: String, id: String) {
+        viewModelScope.launch {
+            useCases.saveSession(
+                UserSession(
+                    userId = id.ifBlank { "google_user" },
+                    userName = userName,
+                    email = email,
+                    photoUrl = photoUrl,
+                    isLoggedIn = true
+                )
+            )
+        }
+    }
 }
 
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
     private val useCases: NoteUseCases
 ) : ViewModel() {
+    private val pageSize = 10
     private val query = MutableStateFlow("")
+    private val page = MutableStateFlow(1)
     val session = useCases.observeSession().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UserSession())
 
-    val uiState: StateFlow<DashboardUiState> = combine(session, query) { s, q -> s to q }
-        .combine(useCases.observeNotes("local_user")) { (s, q), notes ->
-            val filtered = if (q.isBlank()) notes else notes.filter {
-                it.title.contains(q, true) || it.description.contains(q, true)
-            }
-            DashboardUiState(s, q, filtered)
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DashboardUiState())
+    val uiState: StateFlow<DashboardUiState> = combine(session, query, page, useCases.observeNotes("local_user")) { s, q, p, notes ->
+        val filtered = if (q.isBlank()) notes else notes.filter {
+            it.title.contains(q, true) || it.description.contains(q, true)
+        }
+        val visible = filtered.take(p * pageSize)
+        DashboardUiState(
+            session = s,
+            searchQuery = q,
+            notes = filtered,
+            visibleNotes = visible,
+            page = p,
+            hasMore = visible.size < filtered.size
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DashboardUiState())
 
     fun onSearch(text: String) {
         query.value = text
+        page.value = 1
+    }
+
+    fun loadNextPage() {
+        page.value += 1
     }
 
     fun signOut() {
