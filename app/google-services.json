@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "142468768919",
+    "project_id": "theslate-1b85d",
+    "storage_bucket": "theslate-1b85d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:142468768919:android:813ce69beea155e221f5d2",
+        "android_client_info": {
+          "package_name": "com.vishalpvijayan.theslate"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "142468768919-fh67hhv9989eeahc6nsg7008ipi9u54a.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBcyo0F6bfx8gUyWzpWZRPp9NA6UNXjwd8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "142468768919-fh67hhv9989eeahc6nsg7008ipi9u54a.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
