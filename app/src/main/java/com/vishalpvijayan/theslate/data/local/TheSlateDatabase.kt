@@ -5,7 +5,7 @@ import androidx.room.RoomDatabase
 
 @Database(
     entities = [NoteEntity::class, ChecklistItemEntity::class, TableCellEntity::class, SyncQueueEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class TheSlateDatabase : RoomDatabase() {

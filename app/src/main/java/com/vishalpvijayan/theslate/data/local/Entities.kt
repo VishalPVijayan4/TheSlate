@@ -12,6 +12,7 @@ data class NoteEntity(
     val updatedAt: Long,
     val imageAttachmentsJson: String,
     val audioAttachmentsJson: String,
+    val tagsJson: String,
     val drawingImagePath: String?,
     val alarmTime: Long?,
     val isSynced: Boolean,

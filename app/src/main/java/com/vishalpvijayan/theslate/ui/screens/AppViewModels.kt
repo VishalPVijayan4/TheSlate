@@ -68,7 +68,9 @@ class DashboardViewModel @Inject constructor(
 
     val uiState: StateFlow<DashboardUiState> = combine(session, query, page, useCases.observeNotes("local_user")) { s, q, p, notes ->
         val filtered = if (q.isBlank()) notes else notes.filter {
-            it.title.contains(q, true) || it.description.contains(q, true)
+            it.title.contains(q, true) ||
+                it.description.contains(q, true) ||
+                it.tags.any { tag -> tag.contains(q, true) }
         }
         val visible = filtered.take(p * pageSize)
         DashboardUiState(
@@ -150,6 +152,21 @@ class NoteEditorViewModel @Inject constructor(
     }
 
     fun setAlarm(timeMillis: Long?) { _note.value = _note.value.copy(alarmTime = timeMillis, isSynced = false) }
+
+
+    fun addTag(value: String) {
+        val normalized = value.trim()
+        if (normalized.isBlank()) return
+        if (_note.value.tags.any { it.equals(normalized, ignoreCase = true) }) return
+        _note.value = _note.value.copy(tags = _note.value.tags + normalized, isSynced = false)
+    }
+
+    fun removeTag(tag: String) {
+        _note.value = _note.value.copy(
+            tags = _note.value.tags.filterNot { it.equals(tag, ignoreCase = true) },
+            isSynced = false
+        )
+    }
 
     fun save(onDone: () -> Unit) {
         viewModelScope.launch {
