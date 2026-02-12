@@ -39,6 +39,12 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.Brush
+import androidx.compose.material.icons.filled.Checklist
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -481,89 +487,140 @@ fun LoginScreen(viewModel: LoginViewModel, onLoginSuccess: () -> Unit) {
 fun DashboardScreen(viewModel: DashboardViewModel, onOpenNote: (String) -> Unit, onCreate: () -> Unit, onSignedOut: () -> Unit) {
     val state by viewModel.uiState.collectAsState()
     val now = remember { SimpleDateFormat("EEE, dd MMM yyyy HH:mm", Locale.getDefault()).format(Date()) }
+    val filters = remember { listOf("All", "Starred", "Birthdays", "Todos") }
+    var selectedFilter by remember { mutableStateOf("All") }
 
-    Scaffold(floatingActionButton = { FloatingActionButton(onClick = onCreate) { Icon(Icons.Default.Add, null) } }) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
+    val filteredNotes = remember(state.visibleNotes, selectedFilter) {
+        if (selectedFilter == "All") state.visibleNotes
+        else state.visibleNotes.filter { note -> note.tags.any { it.equals(selectedFilter, true) } }
+    }
+
+    Scaffold(
+        floatingActionButton = {
+            FloatingActionButton(onClick = onCreate) { Icon(Icons.Default.Add, contentDescription = "Create note") }
+        }
+    ) { padding ->
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp)
+        ) {
             val hour = remember { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
             val greet = when (hour) { in 0..11 -> "Good Morning"; in 12..16 -> "Good Afternoon"; else -> "Good Evening" }
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(14.dp)) {
-                    Column(Modifier.weight(1f)) {
-                        Text("$greet, ${state.session.userName.ifBlank { "User" }}", fontWeight = FontWeight.Bold)
-                        Text(now, style = MaterialTheme.typography.bodySmall)
-                    }
-                    AsyncImage(model = state.session.photoUrl.ifBlank { null }, contentDescription = null, modifier = Modifier.size(48.dp).clip(CircleShape))
+
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                AsyncImage(
+                    model = state.session.photoUrl.ifBlank { null },
+                    contentDescription = null,
+                    modifier = Modifier.size(44.dp).clip(CircleShape)
+                )
+                Spacer(Modifier.size(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("$greet", fontWeight = FontWeight.SemiBold)
+                    Text(state.session.userName.ifBlank { "User" }, style = MaterialTheme.typography.bodyMedium)
+                }
+                IconButton(onClick = { }) {
+                    Text("💡")
                 }
             }
+
+            Text(now, style = MaterialTheme.typography.bodySmall)
             Spacer(Modifier.height(12.dp))
 
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                filters.forEach { filter ->
+                    androidx.compose.material3.FilterChip(
+                        selected = selectedFilter == filter,
+                        onClick = { selectedFilter = filter },
+                        label = { Text(filter.uppercase()) }
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(10.dp))
             if (state.notes.isNotEmpty()) {
                 OutlinedTextField(
                     value = state.searchQuery,
                     onValueChange = viewModel::onSearch,
-                    label = { Text("Search notes or tags") },
+                    label = { Text("Search") },
                     modifier = Modifier.fillMaxWidth()
                 )
             }
 
             Spacer(Modifier.height(12.dp))
             if (state.notes.isEmpty()) {
-                Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
-                    Column(Modifier.fillMaxWidth().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Your dashboard is empty", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                        Spacer(Modifier.height(6.dp))
-                        Text("Create your first note to get started. Tags are optional and help with filtering.", textAlign = TextAlign.Center)
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    Column(
+                        Modifier.fillMaxWidth().padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text("What's your thoughts for today?", style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
                         Spacer(Modifier.height(12.dp))
+                        Text("Use + to create your first note. You can keep labels empty or add them later.", textAlign = TextAlign.Center)
+                        Spacer(Modifier.height(10.dp))
                         Button(onClick = onCreate) { Text("Create note") }
                     }
                 }
                 Spacer(Modifier.weight(1f))
             } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
-                    items(state.visibleNotes) { note ->
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.weight(1f)) {
+                    items(filteredNotes) { note ->
                         Card(
                             modifier = Modifier.fillMaxWidth().clickable { onOpenNote(note.noteId) },
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                         ) {
-                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(note.title.ifBlank { "Untitled" }, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                                    Spacer(Modifier.size(10.dp).clip(CircleShape).background(if (note.isSynced) androidx.compose.ui.graphics.Color(0xFF2E7D32) else androidx.compose.ui.graphics.Color(0xFFC62828)))
+                                    Spacer(
+                                        Modifier
+                                            .size(10.dp)
+                                            .clip(CircleShape)
+                                            .background(if (note.isSynced) androidx.compose.ui.graphics.Color(0xFF2E7D32) else androidx.compose.ui.graphics.Color(0xFFC62828))
+                                    )
                                 }
-                                Text(note.description.take(110))
+                                Text(note.description.take(120))
                                 if (note.tags.isNotEmpty()) {
-                                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                         note.tags.forEach { tag ->
-                                            Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.secondaryContainer) {
-                                                Text("#$tag", modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium)
+                                            Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.secondaryContainer) {
+                                                Text("$tag", modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium)
                                             }
                                         }
                                     }
                                 }
-                                Text("Edited: ${SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()).format(Date(note.updatedAt))}", style = MaterialTheme.typography.bodySmall)
+                                Text(
+                                    "Last edited: ${SimpleDateFormat("dd MMM, HH:mm", Locale.getDefault()).format(Date(note.updatedAt))}",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
                             }
                         }
                     }
                     if (state.hasMore) {
                         item {
-                            Button(onClick = viewModel::loadNextPage, modifier = Modifier.fillMaxWidth()) { Text("Load more") }
+                            OutlinedButton(onClick = viewModel::loadNextPage, modifier = Modifier.fillMaxWidth()) { Text("Load more") }
                         }
                     }
                 }
             }
 
-            Spacer(Modifier.height(8.dp))
-            OutlinedButton(onClick = { viewModel.signOut(); onSignedOut() }, modifier = Modifier.fillMaxWidth()) { Text("Sign out") }
+            OutlinedButton(onClick = { viewModel.signOut(); onSignedOut() }, modifier = Modifier.fillMaxWidth()) {
+                Text("Sign out")
+            }
         }
     }
 }
 
-private enum class EditorTool(val label: String) {
-    Reminder("Reminder"),
-    Checklist("Checklist"),
-    Attachments("Attachment"),
-    Audio("Audio"),
-    Canvas("Canvas")
+private enum class EditorTool(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    Reminder("Alarm", Icons.Default.Notifications),
+    Checklist("Checklist", Icons.Default.Checklist),
+    Attachments("Attachment", Icons.Default.AttachFile),
+    Audio("Audio", Icons.Default.Mic),
+    Canvas("Canvas", Icons.Default.Brush)
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -578,7 +635,7 @@ fun NoteEditorScreen(viewModel: NoteEditorViewModel, onBack: () -> Unit) {
     var tagInput by remember { mutableStateOf("") }
     var isRecording by remember { mutableStateOf(false) }
     var recordingPath by remember { mutableStateOf<String?>(null) }
-    var activeTool by remember { mutableStateOf(EditorTool.Checklist) }
+    var activeTool by remember { mutableStateOf(EditorTool.Reminder) }
     val recorder = remember { AudioRecorder(context) }
 
     val strokes = remember { mutableStateListOf<List<Offset>>() }
@@ -609,41 +666,50 @@ fun NoteEditorScreen(viewModel: NoteEditorViewModel, onBack: () -> Unit) {
                     NavigationBarItem(
                         selected = activeTool == tool,
                         onClick = { activeTool = tool },
-                        icon = { Text(tool.label.take(1)) },
+                        icon = { Icon(tool.icon, contentDescription = tool.label) },
                         label = { Text(tool.label) }
                     )
                 }
             }
         }
     ) { padding ->
-        LazyColumn(Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        LazyColumn(
+            Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
             item {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("${mode.name} Note", style = MaterialTheme.typography.titleLarge)
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    IconButton(onClick = onBack) { Text("✕") }
+                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("Title", style = MaterialTheme.typography.titleMedium)
+                    }
                     Row {
-                        if (mode == NoteMode.VIEW) IconButton(onClick = { viewModel.setMode(NoteMode.EDIT) }) { Icon(Icons.Default.Edit, null) }
-                        IconButton(onClick = { viewModel.delete(onBack) }) { Icon(Icons.Default.Delete, null) }
+                        IconButton(onClick = { }) { Icon(Icons.Default.Visibility, contentDescription = "View") }
+                        IconButton(onClick = { viewModel.setMode(if (mode == NoteMode.VIEW) NoteMode.EDIT else NoteMode.VIEW) }) { Icon(Icons.Default.Edit, contentDescription = "Toggle edit") }
                     }
                 }
             }
+
             item { OutlinedTextField(value = note.title, onValueChange = viewModel::updateTitle, enabled = mode != NoteMode.VIEW, label = { Text("Title") }, modifier = Modifier.fillMaxWidth()) }
-            item { OutlinedTextField(value = note.description, onValueChange = viewModel::updateDescription, enabled = mode != NoteMode.VIEW, label = { Text("Description") }, modifier = Modifier.fillMaxWidth()) }
+            item { OutlinedTextField(value = note.description, onValueChange = viewModel::updateDescription, enabled = mode != NoteMode.VIEW, label = { Text("Subtitle") }, modifier = Modifier.fillMaxWidth()) }
+            item { Text(SimpleDateFormat("EEE, dd MMM yyyy HH:mm", Locale.getDefault()).format(Date(note.updatedAt)), style = MaterialTheme.typography.bodySmall) }
 
             item {
-                Text("Labels (optional)")
+                Text("Labels / Tags")
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     note.tags.forEach { tag ->
                         androidx.compose.material3.InputChip(
                             selected = false,
                             onClick = { if (mode != NoteMode.VIEW) viewModel.removeTag(tag) },
-                            label = { Text("#$tag") },
+                            label = { Text(tag) },
                             enabled = mode != NoteMode.VIEW
                         )
                     }
                 }
                 if (mode != NoteMode.VIEW) {
+                    Spacer(Modifier.height(8.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        OutlinedTextField(value = tagInput, onValueChange = { tagInput = it }, label = { Text("Add tag") }, modifier = Modifier.weight(1f))
+                        OutlinedTextField(value = tagInput, onValueChange = { tagInput = it }, label = { Text("Add label") }, modifier = Modifier.weight(1f))
                         Button(onClick = { viewModel.addTag(tagInput); tagInput = "" }) { Text("Add") }
                     }
                 }
@@ -653,7 +719,7 @@ fun NoteEditorScreen(viewModel: NoteEditorViewModel, onBack: () -> Unit) {
                 when (activeTool) {
                     EditorTool.Reminder -> {
                         Text("Alarm: ${note.alarmTime?.let { Date(it) } ?: "Not set"}")
-                        if (mode != NoteMode.VIEW) Button(onClick = { viewModel.setAlarm(System.currentTimeMillis() + 60_000) }) { Text("Set +1 Min Alarm") }
+                        if (mode != NoteMode.VIEW) Button(onClick = { viewModel.setAlarm(System.currentTimeMillis() + 60_000) }) { Text("Set +1 Min") }
                     }
                     EditorTool.Checklist -> {
                         Text("Checklist")
@@ -665,7 +731,7 @@ fun NoteEditorScreen(viewModel: NoteEditorViewModel, onBack: () -> Unit) {
                         }
                         if (mode != NoteMode.VIEW) {
                             OutlinedTextField(value = checklistInput, onValueChange = { checklistInput = it }, label = { Text("Checklist item") }, modifier = Modifier.fillMaxWidth())
-                            Button(onClick = { viewModel.addChecklist(checklistInput); checklistInput = "" }) { Text("Add Checklist Item") }
+                            Button(onClick = { viewModel.addChecklist(checklistInput); checklistInput = "" }) { Text("Add checklist") }
                         }
                     }
                     EditorTool.Attachments -> {
@@ -701,9 +767,7 @@ fun NoteEditorScreen(viewModel: NoteEditorViewModel, onBack: () -> Unit) {
                                     recordingPath = null
                                     isRecording = false
                                 }
-                            }) {
-                                Text(if (isRecording) "Stop & Save Recording" else "Record Audio")
-                            }
+                            }) { Text(if (isRecording) "Stop & Save" else "Record") }
                         }
                     }
                     EditorTool.Canvas -> {
@@ -739,10 +803,12 @@ fun NoteEditorScreen(viewModel: NoteEditorViewModel, onBack: () -> Unit) {
                                         }
                                     }
                                 }
+                            }) {
+                                Text(if (isRecording) "Stop & Save Recording" else "Record Audio")
                             }
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Button(onClick = { strokes.clear() }) { Text("Clear") }
-                                Button(onClick = { saveDrawing(context, strokes)?.let(viewModel::setDrawing) }) { Text("Save Drawing") }
+                                Button(onClick = { saveDrawing(context, strokes)?.let(viewModel::setDrawing) }) { Text("Save") }
                             }
                         }
                     }
@@ -763,8 +829,8 @@ fun NoteEditorScreen(viewModel: NoteEditorViewModel, onBack: () -> Unit) {
 
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Button(onClick = onBack) { Text("Back") }
-                    if (mode != NoteMode.VIEW) Button(onClick = { viewModel.save(onBack) }) { Icon(Icons.Default.Check, null); Text("Save") }
+                    OutlinedButton(onClick = { viewModel.delete(onBack) }) { Icon(Icons.Default.Delete, contentDescription = null); Text(" Delete") }
+                    Button(onClick = { viewModel.save(onBack) }, enabled = mode != NoteMode.VIEW) { Icon(Icons.Default.Check, contentDescription = null); Text(" Save") }
                 }
             }
         }
