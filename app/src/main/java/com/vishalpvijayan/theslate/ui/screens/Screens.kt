@@ -42,6 +42,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.Checklist
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Visibility
@@ -520,8 +521,8 @@ fun DashboardScreen(viewModel: DashboardViewModel, onOpenNote: (String) -> Unit,
                     Text("$greet", fontWeight = FontWeight.SemiBold)
                     Text(state.session.userName.ifBlank { "User" }, style = MaterialTheme.typography.bodyMedium)
                 }
-                IconButton(onClick = { }) {
-                    Text("💡")
+                IconButton(onClick = { /* reserved for insights */ }) {
+                    Icon(Icons.Default.Notifications, contentDescription = "Highlights")
                 }
             }
 
@@ -558,7 +559,7 @@ fun DashboardScreen(viewModel: DashboardViewModel, onOpenNote: (String) -> Unit,
                         Modifier.fillMaxWidth().padding(24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text("What's your thoughts for today?", style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
+                        Text("What are your thoughts for today?", style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
                         Spacer(Modifier.height(12.dp))
                         Text("Use + to create your first note. You can keep labels empty or add them later.", textAlign = TextAlign.Center)
                         Spacer(Modifier.height(10.dp))
@@ -588,15 +589,15 @@ fun DashboardScreen(viewModel: DashboardViewModel, onOpenNote: (String) -> Unit,
                                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                         note.tags.forEach { tag ->
                                             Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.secondaryContainer) {
-                                                Text("$tag", modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium)
+                                                Text(tag, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium)
                                             }
                                         }
                                     }
                                 }
-                                Text(
-                                    "Last edited: ${SimpleDateFormat("dd MMM, HH:mm", Locale.getDefault()).format(Date(note.updatedAt))}",
-                                    style = MaterialTheme.typography.bodySmall
-                                )
+                                val editedAt = remember(note.updatedAt) {
+                                    SimpleDateFormat("dd MMM, HH:mm", Locale.getDefault()).format(Date(note.updatedAt))
+                                }
+                                Text("Last edited: $editedAt", style = MaterialTheme.typography.bodySmall)
                             }
                         }
                     }
@@ -679,7 +680,7 @@ fun NoteEditorScreen(viewModel: NoteEditorViewModel, onBack: () -> Unit) {
         ) {
             item {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                    IconButton(onClick = onBack) { Text("✕") }
+                    IconButton(onClick = onBack) { Icon(Icons.Default.Close, contentDescription = "Close") }
                     Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("Title", style = MaterialTheme.typography.titleMedium)
                     }
@@ -805,6 +806,10 @@ fun NoteEditorScreen(viewModel: NoteEditorViewModel, onBack: () -> Unit) {
                                 }
                             }) {
                                 Text(if (isRecording) "Stop & Save Recording" else "Record Audio")
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(onClick = { strokes.clear() }) { Text("Clear") }
+                                Button(onClick = { saveDrawing(context, strokes)?.let(viewModel::setDrawing) }) { Text("Save") }
                             }
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Button(onClick = { strokes.clear() }) { Text("Clear") }
