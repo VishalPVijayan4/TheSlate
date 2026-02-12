@@ -250,8 +250,8 @@ fun NoteEditorScreen(viewModel: NoteEditorViewModel, onBack: () -> Unit) {
     var recordingPath by remember { mutableStateOf<String?>(null) }
     val recorder = remember { AudioRecorder(context) }
 
-    val strokes = remember { mutableStateListOf<MutableList<Offset>>() }
-    var currentStroke by remember { mutableStateOf<MutableList<Offset>?>(null) }
+    val strokes = remember { mutableStateListOf<List<Offset>>() }
+    var currentStroke by remember { mutableStateOf<List<Offset>>(emptyList()) }
 
     val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         uri?.let { viewModel.addImage(it.toString()) }
@@ -336,8 +336,16 @@ fun NoteEditorScreen(viewModel: NoteEditorViewModel, onBack: () -> Unit) {
                     ) {
                         Canvas(modifier = Modifier.fillMaxSize().pointerInput(Unit) {
                             detectDragGestures(
-                                onDragStart = { start -> currentStroke = mutableListOf(start).also(strokes::add) },
-                                onDrag = { change, _ -> currentStroke?.add(change.position) }
+                                onDragStart = { start ->
+                                    currentStroke = listOf(start)
+                                    strokes.add(currentStroke)
+                                },
+                                onDrag = { change, _ ->
+                                    if (strokes.isNotEmpty()) {
+                                        currentStroke = currentStroke + change.position
+                                        strokes[strokes.lastIndex] = currentStroke
+                                    }
+                                }
                             )
                         }) {
                             strokes.forEach { stroke ->
