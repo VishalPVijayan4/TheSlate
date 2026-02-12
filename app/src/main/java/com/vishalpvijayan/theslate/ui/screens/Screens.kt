@@ -9,6 +9,8 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -36,16 +38,20 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -63,10 +69,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.google.android.gms.auth.api.signin.GoogleSignIn
@@ -83,7 +91,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-@Composable
+/*@Composable
 fun SplashScreen(isLoggedIn: Boolean, onComplete: (Boolean) -> Unit) {
     LaunchedEffect(Unit) {
         delay(2500)
@@ -92,56 +100,238 @@ fun SplashScreen(isLoggedIn: Boolean, onComplete: (Boolean) -> Unit) {
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
         Text("TheSlate", style = MaterialTheme.typography.headlineLarge)
         Text("Capture everything, offline-first")
+        Text("Version 1.0.0", style = MaterialTheme.typography.bodySmall)
+    }
+}*/
+
+@Composable
+fun SplashScreen(isLoggedIn: Boolean, onComplete: (Boolean) -> Unit) {
+
+    LaunchedEffect(Unit) {
+        delay(2500)
+        onComplete(isLoggedIn)
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(32.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+
+            Text(
+                text = "TheSlate",
+                style = MaterialTheme.typography.headlineLarge,
+                color = MaterialTheme.colorScheme.secondary
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Divider(
+                color = MaterialTheme.colorScheme.primary,
+                thickness = 1.dp,
+                modifier = Modifier.fillMaxWidth(0.5f)
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = "Capture everything, offline-first",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+
+            Spacer(modifier = Modifier.height(40.dp))
+
+            Text(
+                text = "Version 1.0.0",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
     }
 }
+
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun OnboardingScreen(onProceed: () -> Unit) {
+
     val pages = listOf(
-        Triple("Capture", "Write rich notes with checklists and tables", "📝"),
-        Triple("Attach", "Add images, audio, and drawings", "🖼️"),
-        Triple("Sync", "Offline-first sync with status indicators", "☁️")
+        Triple(
+            "Capture Every Thought",
+            "TheSlate helps you capture ideas instantly. Write notes, add checklists, insert tables, attach images, record audio, and even sketch your thoughts. Everything you need to organize your mind in one powerful space.",
+            "✒"
+        ),
+        Triple(
+            "More Than Just Notes",
+            "Attach up to 5 images, record audio, draw on a built-in canvas, create checkbox lists, and design dynamic tables. TheSlate adapts to your thinking style — structured, creative, or somewhere in between.",
+            "📜"
+        ),
+        Triple(
+            "Safe, Synced, Always Ready",
+            "Your notes are saved offline first and automatically synced to your Google Drive when internet is available. Set reminders with alarms that work even after reboot. Your ideas stay secure, accessible, and always in sync.",
+            "🕯"
+        )
     )
+
     val pagerState = rememberPagerState { pages.size }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(pagerState.currentPage) {
         delay(3000)
-        if (pagerState.currentPage < pages.lastIndex) pagerState.animateScrollToPage(pagerState.currentPage + 1)
+        if (pagerState.currentPage < pages.lastIndex) {
+            pagerState.animateScrollToPage(pagerState.currentPage + 1)
+        }
     }
 
-    Column(Modifier.fillMaxSize().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        HorizontalPager(state = pagerState, modifier = Modifier.weight(1f)) { page ->
-            val item = pages[page]
-            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(item.third, style = MaterialTheme.typography.displayMedium)
-                Spacer(Modifier.height(16.dp))
-                Text(item.first, style = MaterialTheme.typography.headlineMedium)
-                Spacer(Modifier.height(8.dp))
-                Text(item.second)
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 24.dp, vertical = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.weight(1f)
+            ) { page ->
+
+                val item = pages[page]
+
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+
+                    Text(
+                        text = item.third,
+                        style = MaterialTheme.typography.displayMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+
+                    Spacer(Modifier.height(24.dp))
+
+                    Text(
+                        text = item.first,
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+
+                    Spacer(Modifier.height(12.dp))
+
+                    Divider(
+                        modifier = Modifier.fillMaxWidth(0.4f),
+                        thickness = 1.dp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+
+                    Spacer(Modifier.height(16.dp))
+
+                    Text(
+                        text = item.second,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            pages.indices.forEach { idx ->
-                Spacer(Modifier.size(10.dp).clip(CircleShape).background(if (pagerState.currentPage == idx) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline))
+
+            Spacer(Modifier.height(24.dp))
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                pages.indices.forEach { idx ->
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (pagerState.currentPage == idx)
+                                    MaterialTheme.colorScheme.primary
+                                else
+                                    MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f)
+                            )
+                    )
+                }
             }
-        }
-        Spacer(Modifier.height(16.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Button(onClick = { scope.launch { pagerState.animateScrollToPage((pagerState.currentPage - 1).coerceAtLeast(0)) } }, enabled = pagerState.currentPage > 0) { Text("Previous") }
-            if (pagerState.currentPage == pages.lastIndex) Button(onClick = onProceed) { Text("Proceed to Login") }
-            else Button(onClick = { scope.launch { pagerState.animateScrollToPage((pagerState.currentPage + 1).coerceAtMost(pages.lastIndex)) } }) { Text("Next") }
+
+            Spacer(Modifier.height(32.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+
+                OutlinedButton(
+                    onClick = {
+                        scope.launch {
+                            pagerState.animateScrollToPage(
+                                (pagerState.currentPage - 1).coerceAtLeast(0)
+                            )
+                        }
+                    },
+                    enabled = pagerState.currentPage > 0,
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.secondary
+                    )
+                ) {
+                    Text("Previous")
+                }
+
+                if (pagerState.currentPage == pages.lastIndex) {
+                    Button(
+                        onClick = onProceed,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        )
+                    ) {
+                        Text("Proceed to Login")
+                    }
+                } else {
+                    Button(
+                        onClick = {
+                            scope.launch {
+                                pagerState.animateScrollToPage(
+                                    (pagerState.currentPage + 1)
+                                        .coerceAtMost(pages.lastIndex)
+                                )
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        )
+                    ) {
+                        Text("Next")
+                    }
+                }
+            }
         }
     }
 }
 
+
 @Composable
 fun LoginScreen(viewModel: LoginViewModel, onLoginSuccess: () -> Unit) {
+
     val context = LocalContext.current
     val webClientId = ""
     val hasPlayServices = remember {
-        GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(context) == ConnectionResult.SUCCESS
+        GoogleApiAvailability.getInstance()
+            .isGooglePlayServicesAvailable(context) == ConnectionResult.SUCCESS
     }
 
     val gso = remember {
@@ -149,43 +339,138 @@ fun LoginScreen(viewModel: LoginViewModel, onLoginSuccess: () -> Unit) {
             .requestEmail()
             .build()
     }
+
     val signInClient = remember { GoogleSignIn.getClient(context, gso) }
 
-    val signInLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        val accountTask = GoogleSignIn.getSignedInAccountFromIntent(result.data)
-        if (accountTask.isSuccessful) {
-            val account = accountTask.result
-            if (account != null) {
-                viewModel.onGoogleSignedIn(
-                    userName = account.displayName.orEmpty(),
-                    email = account.email.orEmpty(),
-                    photoUrl = account.photoUrl?.toString().orEmpty(),
-                    id = account.id.orEmpty()
+    val signInLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            val accountTask = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+            if (accountTask.isSuccessful) {
+                val account = accountTask.result
+                if (account != null) {
+                    viewModel.onGoogleSignedIn(
+                        userName = account.displayName.orEmpty(),
+                        email = account.email.orEmpty(),
+                        photoUrl = account.photoUrl?.toString().orEmpty(),
+                        id = account.id.orEmpty()
+                    )
+                    onLoginSuccess()
+                }
+            }
+        }
+
+    // Animation states
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { visible = true }
+
+    val animatedAlpha by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        label = ""
+    )
+
+    val animatedOffset by animateDpAsState(
+        targetValue = if (visible) 0.dp else 40.dp,
+        label = ""
+    )
+
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(32.dp)
+                .graphicsLayer {
+                    alpha = animatedAlpha
+                    translationY = animatedOffset.toPx()
+                },
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+
+            Text(
+                text = "TheSlate",
+                style = MaterialTheme.typography.headlineLarge,
+                color = MaterialTheme.colorScheme.secondary
+            )
+
+            Spacer(Modifier.height(12.dp))
+
+            Divider(
+                modifier = Modifier.fillMaxWidth(0.5f),
+                thickness = 1.dp,
+                color = MaterialTheme.colorScheme.primary
+            )
+
+            Spacer(Modifier.height(24.dp))
+
+            Text(
+                text = "Sign in to continue your archive",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+
+            Spacer(Modifier.height(32.dp))
+
+            if (!hasPlayServices) {
+                Text(
+                    "Google Play Services unavailable on this device.",
+                    color = MaterialTheme.colorScheme.primary
                 )
-                onLoginSuccess()
+                Spacer(Modifier.height(16.dp))
+            }
+
+            if (webClientId.isBlank()) {
+                Text(
+                    "Configure Web Client ID for production use.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.secondary
+                )
+                Spacer(Modifier.height(16.dp))
+            }
+
+            // Animated scale effect for primary button
+            val scale by animateFloatAsState(
+                targetValue = if (visible) 1f else 0.8f,
+                label = ""
+            )
+
+            Button(
+                onClick = { signInLauncher.launch(signInClient.signInIntent) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                    },
+                enabled = hasPlayServices,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                )
+            ) {
+                Text("Sign in with Google")
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            OutlinedButton(
+                onClick = {
+                    viewModel.loginAsDemo()
+                    onLoginSuccess()
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.secondary
+                )
+            ) {
+                Text("Continue Demo")
             }
         }
     }
-
-    Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("Login", style = MaterialTheme.typography.headlineLarge)
-        Spacer(Modifier.height(12.dp))
-        if (!hasPlayServices) {
-            Text("Google Play Services unavailable on this device.")
-        }
-        if (webClientId.isBlank()) {
-            Text("Google Sign-In API check: add your Web Client ID and scope config for production.")
-        }
-        Spacer(Modifier.height(20.dp))
-        Button(
-            onClick = { signInLauncher.launch(signInClient.signInIntent) },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = hasPlayServices
-        ) { Text("Sign in with Google") }
-        Spacer(Modifier.height(8.dp))
-        Button(onClick = { viewModel.loginAsDemo(); onLoginSuccess() }, modifier = Modifier.fillMaxWidth()) { Text("Continue Demo") }
-    }
 }
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
