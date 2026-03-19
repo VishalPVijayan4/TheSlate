@@ -3,12 +3,12 @@ package com.vishalpvijayan.theslate.ui.screens
 import android.Manifest
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.Color
 import android.graphics.Paint
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
@@ -26,10 +26,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -53,9 +56,12 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -64,6 +70,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -76,8 +83,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
@@ -99,21 +109,12 @@ import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.vector.ImageVector
 
-/*@Composable
-fun SplashScreen(isLoggedIn: Boolean, onComplete: (Boolean) -> Unit) {
-    LaunchedEffect(Unit) {
-        delay(2500)
-        onComplete(isLoggedIn)
-    }
-    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("TheSlate", style = MaterialTheme.typography.headlineLarge)
-        Text("Capture everything, offline-first")
-        Text("Version 1.0.0", style = MaterialTheme.typography.bodySmall)
-    }
-}*/
 
 @Composable
 fun SplashScreen(isLoggedIn: Boolean, onComplete: (Boolean) -> Unit) {
@@ -482,12 +483,296 @@ fun LoginScreen(viewModel: LoginViewModel, onLoginSuccess: () -> Unit) {
     }
 }
 
-
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun DashboardScreen(viewModel: DashboardViewModel, onOpenNote: (String) -> Unit, onCreate: () -> Unit, onSignedOut: () -> Unit) {
+fun DashboardScreen(
+    viewModel: DashboardViewModel,
+    onOpenNote: (String) -> Unit,
+    onCreate: () -> Unit,
+    onSignedOut: () -> Unit
+) {
     val state by viewModel.uiState.collectAsState()
-    val now = remember { SimpleDateFormat("EEE, dd MMM yyyy HH:mm", Locale.getDefault()).format(Date()) }
+
+    val now =
+        remember { SimpleDateFormat("EEE, dd MMM yyyy HH:mm", Locale.getDefault()).format(Date()) }
+
+    val filters = remember { listOf("All", "Starred", "Birthdays", "Todos") }
+    var selectedFilter by remember { mutableStateOf("All") }
+
+    val filteredNotes = remember(state.visibleNotes, selectedFilter) {
+        if (selectedFilter == "All") state.visibleNotes
+        else state.visibleNotes.filter { note -> note.tags.any { it.equals(selectedFilter, true) } }
+    }
+
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { visible = true }
+
+    val animatedAlpha by animateFloatAsState(if (visible) 1f else 0f, label = "")
+    val animatedOffset by animateDpAsState(if (visible) 0.dp else 40.dp, label = "")
+
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = onCreate,
+                containerColor = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.scale(animateFloatAsState(if (visible) 1f else 0.6f).value)
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "Create")
+            }
+        }
+    ) { padding ->
+
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(18.dp)
+                .alpha(animatedAlpha)
+                .offset(y = animatedOffset)
+        ) {
+
+            /* ---------------- HEADER ---------------- */
+
+            val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+            val greet = when (hour) {
+                in 0..11 -> "Good Morning"
+                in 12..16 -> "Good Afternoon"
+                else -> "Good Evening"
+            }
+
+            Card(
+                shape = RoundedCornerShape(28.dp),
+                colors = CardDefaults.cardColors(MaterialTheme.colorScheme.primaryContainer),
+                elevation = CardDefaults.cardElevation(6.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(18.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+
+                    AsyncImage(
+                        model = state.session.photoUrl.ifBlank { null },
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(54.dp)
+                            .clip(CircleShape)
+                    )
+
+                    Spacer(Modifier.width(14.dp))
+
+                    Column(Modifier.weight(1f)) {
+                        Text(greet, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            state.session.userName.ifBlank { "User" },
+                            style = MaterialTheme.typography.headlineSmall
+                        )
+                        Text(now, style = MaterialTheme.typography.bodySmall)
+                    }
+
+                    IconButton(onClick = {}) {
+                        Icon(Icons.Default.Notifications, contentDescription = null)
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            /* ---------------- FILTERS ---------------- */
+
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                filters.forEach { filter ->
+                    val selected = selectedFilter == filter
+                    FilterChip(
+                        selected = selected,
+                        onClick = { selectedFilter = filter },
+                        label = { Text(filter) },
+                        modifier = Modifier.animateContentSize(),
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primary,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                        )
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(14.dp))
+
+            /* ---------------- SEARCH ---------------- */
+
+            if (state.notes.isNotEmpty()) {
+                OutlinedTextField(
+                    value = state.searchQuery,
+                    onValueChange = viewModel::onSearch,
+                    placeholder = { Text("Search your brain...") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(50),
+                    singleLine = true
+                )
+                Spacer(Modifier.height(14.dp))
+            }
+
+            /* ---------------- CONTENT ---------------- */
+
+            if (state.notes.isEmpty()) {
+
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+
+                    Text(
+                        "Nothing here yet",
+                        style = MaterialTheme.typography.headlineMedium
+                    )
+
+                    Spacer(Modifier.height(8.dp))
+
+                    Text(
+                        "Your future ideas are currently in quantum superposition.",
+                        textAlign = TextAlign.Center
+                    )
+
+                    Spacer(Modifier.height(18.dp))
+
+                    Button(onClick = onCreate) { Text("Create First Note") }
+                }
+
+            } else {
+
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+
+                    itemsIndexed(filteredNotes) { index, note ->
+
+                        val itemVisible by animateFloatAsState(1f, label = "")
+                        val delay = index * 40
+
+                        LaunchedEffect(Unit) {
+                            delay(delay.toLong())
+                        }
+
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .graphicsLayer {
+                                    alpha = itemVisible
+                                    translationY = (1f - itemVisible) * 60f
+                                    scaleX = 0.96f + itemVisible * 0.04f
+                                    scaleY = 0.96f + itemVisible * 0.04f
+                                }
+                                .clickable { onOpenNote(note.noteId) },
+                            shape = RoundedCornerShape(22.dp),
+                            elevation = CardDefaults.cardElevation(8.dp)
+                        ) {
+
+                            Column(
+                                Modifier.padding(18.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        note.title.ifBlank { "Untitled" },
+                                        style = MaterialTheme.typography.titleMedium,
+                                        modifier = Modifier.weight(1f)
+                                    )
+
+                                    Box(
+                                        Modifier
+                                            .size(10.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                if (note.isSynced)
+                                                    Color(0xFF4CAF50)
+                                                else
+                                                    Color(0xFFF44336)
+                                            )
+                                    )
+                                }
+
+                                Text(
+                                    note.description.take(140),
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+
+                                if (note.tags.isNotEmpty()) {
+                                    FlowRow(
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        note.tags.forEach { tag ->
+                                            Surface(
+                                                shape = RoundedCornerShape(50),
+                                                color = MaterialTheme.colorScheme.secondaryContainer
+                                            ) {
+                                                Text(
+                                                    tag,
+                                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
+                                                    style = MaterialTheme.typography.labelMedium
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                val editedAt = remember(note.updatedAt) {
+                                    SimpleDateFormat("dd MMM, HH:mm", Locale.getDefault())
+                                        .format(Date(note.updatedAt))
+                                }
+
+                                Text(
+                                    "Edited $editedAt",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.outline
+                                )
+                            }
+                        }
+                    }
+
+                    if (state.hasMore) {
+                        item {
+                            OutlinedButton(
+                                onClick = viewModel::loadNextPage,
+                                modifier = Modifier.fillMaxWidth()
+                            ) { Text("Load more") }
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            TextButton(
+                onClick = { viewModel.signOut(); onSignedOut() },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Sign out")
+            }
+        }
+    }
+}
+
+
+
+
+/*@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+fun DashboardScreen(
+    viewModel: DashboardViewModel,
+    onOpenNote: (String) -> Unit,
+    onCreate: () -> Unit,
+    onSignedOut: () -> Unit
+) {
+    val state by viewModel.uiState.collectAsState()
+    val now =
+        remember { SimpleDateFormat("EEE, dd MMM yyyy HH:mm", Locale.getDefault()).format(Date()) }
     val filters = remember { listOf("All", "Starred", "Birthdays", "Todos") }
     var selectedFilter by remember { mutableStateOf("All") }
 
@@ -498,7 +783,12 @@ fun DashboardScreen(viewModel: DashboardViewModel, onOpenNote: (String) -> Unit,
 
     Scaffold(
         floatingActionButton = {
-            FloatingActionButton(onClick = onCreate) { Icon(Icons.Default.Add, contentDescription = "Create note") }
+            FloatingActionButton(onClick = onCreate) {
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = "Create note"
+                )
+            }
         }
     ) { padding ->
         Column(
@@ -507,21 +797,32 @@ fun DashboardScreen(viewModel: DashboardViewModel, onOpenNote: (String) -> Unit,
                 .padding(padding)
                 .padding(16.dp)
         ) {
-            val hour = remember { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
-            val greet = when (hour) { in 0..11 -> "Good Morning"; in 12..16 -> "Good Afternoon"; else -> "Good Evening" }
+            val hour =
+                remember { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
+            val greet = when (hour) {
+                in 0..11 -> "Good Morning"; in 12..16 -> "Good Afternoon"; else -> "Good Evening"
+            }
 
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 AsyncImage(
                     model = state.session.photoUrl.ifBlank { null },
                     contentDescription = null,
-                    modifier = Modifier.size(44.dp).clip(CircleShape)
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
                 )
                 Spacer(Modifier.size(10.dp))
                 Column(Modifier.weight(1f)) {
                     Text("$greet", fontWeight = FontWeight.SemiBold)
-                    Text(state.session.userName.ifBlank { "User" }, style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        state.session.userName.ifBlank { "User" },
+                        style = MaterialTheme.typography.bodyMedium
+                    )
                 }
-                IconButton(onClick = { /* reserved for insights */ }) {
+                IconButton(onClick = { *//* reserved for insights *//* }) {
                     Icon(Icons.Default.Notifications, contentDescription = "Highlights")
                 }
             }
@@ -529,7 +830,10 @@ fun DashboardScreen(viewModel: DashboardViewModel, onOpenNote: (String) -> Unit,
             Text(now, style = MaterialTheme.typography.bodySmall)
             Spacer(Modifier.height(12.dp))
 
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 filters.forEach { filter ->
                     androidx.compose.material3.FilterChip(
                         selected = selectedFilter == filter,
@@ -556,67 +860,119 @@ fun DashboardScreen(viewModel: DashboardViewModel, onOpenNote: (String) -> Unit,
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                 ) {
                     Column(
-                        Modifier.fillMaxWidth().padding(24.dp),
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text("What are your thoughts for today?", style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
+                        Text(
+                            "What are your thoughts for today?",
+                            style = MaterialTheme.typography.titleLarge,
+                            textAlign = TextAlign.Center
+                        )
                         Spacer(Modifier.height(12.dp))
-                        Text("Use + to create your first note. You can keep labels empty or add them later.", textAlign = TextAlign.Center)
+                        Text(
+                            "Use + to create your first note. You can keep labels empty or add them later.",
+                            textAlign = TextAlign.Center
+                        )
                         Spacer(Modifier.height(10.dp))
                         Button(onClick = onCreate) { Text("Create note") }
                     }
                 }
                 Spacer(Modifier.weight(1f))
             } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.weight(1f)) {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
                     items(filteredNotes) { note ->
                         Card(
-                            modifier = Modifier.fillMaxWidth().clickable { onOpenNote(note.noteId) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onOpenNote(note.noteId) },
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                         ) {
-                            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Column(
+                                Modifier.padding(14.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(note.title.ifBlank { "Untitled" }, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                                    Text(
+                                        note.title.ifBlank { "Untitled" },
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.weight(1f)
+                                    )
                                     Spacer(
                                         Modifier
                                             .size(10.dp)
                                             .clip(CircleShape)
-                                            .background(if (note.isSynced) androidx.compose.ui.graphics.Color(0xFF2E7D32) else androidx.compose.ui.graphics.Color(0xFFC62828))
+                                            .background(
+                                                if (note.isSynced) androidx.compose.ui.graphics.Color(
+                                                    0xFF2E7D32
+                                                ) else androidx.compose.ui.graphics.Color(0xFFC62828)
+                                            )
                                     )
                                 }
                                 Text(note.description.take(120))
                                 if (note.tags.isNotEmpty()) {
-                                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    FlowRow(
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
                                         note.tags.forEach { tag ->
-                                            Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.secondaryContainer) {
-                                                Text(tag, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium)
+                                            Surface(
+                                                shape = RoundedCornerShape(20.dp),
+                                                color = MaterialTheme.colorScheme.secondaryContainer
+                                            ) {
+                                                Text(
+                                                    tag,
+                                                    modifier = Modifier.padding(
+                                                        horizontal = 10.dp,
+                                                        vertical = 4.dp
+                                                    ),
+                                                    style = MaterialTheme.typography.labelMedium
+                                                )
                                             }
                                         }
                                     }
                                 }
                                 val editedAt = remember(note.updatedAt) {
-                                    SimpleDateFormat("dd MMM, HH:mm", Locale.getDefault()).format(Date(note.updatedAt))
+                                    SimpleDateFormat("dd MMM, HH:mm", Locale.getDefault()).format(
+                                        Date(note.updatedAt)
+                                    )
                                 }
-                                Text("Last edited: $editedAt", style = MaterialTheme.typography.bodySmall)
+                                Text(
+                                    "Last edited: $editedAt",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
                             }
                         }
                     }
                     if (state.hasMore) {
                         item {
-                            OutlinedButton(onClick = viewModel::loadNextPage, modifier = Modifier.fillMaxWidth()) { Text("Load more") }
+                            OutlinedButton(
+                                onClick = viewModel::loadNextPage,
+                                modifier = Modifier.fillMaxWidth()
+                            ) { Text("Load more") }
                         }
                     }
                 }
             }
 
-            OutlinedButton(onClick = { viewModel.signOut(); onSignedOut() }, modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(
+                onClick = { viewModel.signOut(); onSignedOut() },
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 Text("Sign out")
             }
         }
     }
-}
+}*/
 
-private enum class EditorTool(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
+private enum class EditorTool(
+    val label: String,
+    val icon: ImageVector
+) {
     Reminder("Alarm", Icons.Default.Notifications),
     Checklist("Checklist", Icons.Default.Checklist),
     Attachments("Attachment", Icons.Default.AttachFile),
@@ -642,21 +998,25 @@ fun NoteEditorScreen(viewModel: NoteEditorViewModel, onBack: () -> Unit) {
     val strokes = remember { mutableStateListOf<List<Offset>>() }
     var currentStroke by remember { mutableStateOf<List<Offset>>(emptyList()) }
 
-    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        uri?.let { viewModel.addImage(it.toString()) }
-    }
-    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
-        bitmap?.let { saveBitmap(context, it)?.let(viewModel::addImage) }
-    }
-    val cameraPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) cameraLauncher.launch(null)
-    }
-    val audioPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted && !isRecording) {
-            recordingPath = recorder.start()
-            isRecording = true
+    val galleryLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+            uri?.let { viewModel.addImage(it.toString()) }
         }
-    }
+    val cameraLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
+            bitmap?.let { saveBitmap(context, it)?.let(viewModel::addImage) }
+        }
+    val cameraPermissionLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) cameraLauncher.launch(null)
+        }
+    val audioPermissionLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted && !isRecording) {
+                recordingPath = recorder.start()
+                isRecording = true
+            }
+        }
 
     DisposableEffect(Unit) { onDispose { player.release() } }
 
@@ -675,31 +1035,82 @@ fun NoteEditorScreen(viewModel: NoteEditorViewModel, onBack: () -> Unit) {
         }
     ) { padding ->
         LazyColumn(
-            Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp, vertical = 12.dp),
+            Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                    IconButton(onClick = onBack) { Icon(Icons.Default.Close, contentDescription = "Close") }
-                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = "Close"
+                        )
+                    }
+                    Column(
+                        Modifier.weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
                         Text("Title", style = MaterialTheme.typography.titleMedium)
                     }
                     Row {
-                        IconButton(onClick = { }) { Icon(Icons.Default.Visibility, contentDescription = "View") }
-                        IconButton(onClick = { viewModel.setMode(if (mode == NoteMode.VIEW) NoteMode.EDIT else NoteMode.VIEW) }) { Icon(Icons.Default.Edit, contentDescription = "Toggle edit") }
+                        IconButton(onClick = { }) {
+                            Icon(
+                                Icons.Default.Visibility,
+                                contentDescription = "View"
+                            )
+                        }
+                        IconButton(onClick = { viewModel.setMode(if (mode == NoteMode.VIEW) NoteMode.EDIT else NoteMode.VIEW) }) {
+                            Icon(
+                                Icons.Default.Edit,
+                                contentDescription = "Toggle edit"
+                            )
+                        }
                     }
                 }
             }
 
-            item { OutlinedTextField(value = note.title, onValueChange = viewModel::updateTitle, enabled = mode != NoteMode.VIEW, label = { Text("Title") }, modifier = Modifier.fillMaxWidth()) }
-            item { OutlinedTextField(value = note.description, onValueChange = viewModel::updateDescription, enabled = mode != NoteMode.VIEW, label = { Text("Subtitle") }, modifier = Modifier.fillMaxWidth()) }
-            item { Text(SimpleDateFormat("EEE, dd MMM yyyy HH:mm", Locale.getDefault()).format(Date(note.updatedAt)), style = MaterialTheme.typography.bodySmall) }
+            item {
+                OutlinedTextField(
+                    value = note.title,
+                    onValueChange = viewModel::updateTitle,
+                    enabled = mode != NoteMode.VIEW,
+                    label = { Text("Title") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            item {
+                OutlinedTextField(
+                    value = note.description,
+                    onValueChange = viewModel::updateDescription,
+                    enabled = mode != NoteMode.VIEW,
+                    label = { Text("Subtitle") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            item {
+                Text(
+                    SimpleDateFormat("EEE, dd MMM yyyy HH:mm", Locale.getDefault()).format(
+                        Date(
+                            note.updatedAt
+                        )
+                    ), style = MaterialTheme.typography.bodySmall
+                )
+            }
 
             item {
                 Text("Labels / Tags")
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     note.tags.forEach { tag ->
-                        androidx.compose.material3.InputChip(
+                        InputChip(
                             selected = false,
                             onClick = { if (mode != NoteMode.VIEW) viewModel.removeTag(tag) },
                             label = { Text(tag) },
@@ -709,9 +1120,19 @@ fun NoteEditorScreen(viewModel: NoteEditorViewModel, onBack: () -> Unit) {
                 }
                 if (mode != NoteMode.VIEW) {
                     Spacer(Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        OutlinedTextField(value = tagInput, onValueChange = { tagInput = it }, label = { Text("Add label") }, modifier = Modifier.weight(1f))
-                        Button(onClick = { viewModel.addTag(tagInput); tagInput = "" }) { Text("Add") }
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = tagInput,
+                            onValueChange = { tagInput = it },
+                            label = { Text("Add label") },
+                            modifier = Modifier.weight(1f)
+                        )
+                        Button(onClick = {
+                            viewModel.addTag(tagInput); tagInput = ""
+                        }) { Text("Add") }
                     }
                 }
             }
@@ -720,38 +1141,81 @@ fun NoteEditorScreen(viewModel: NoteEditorViewModel, onBack: () -> Unit) {
                 when (activeTool) {
                     EditorTool.Reminder -> {
                         Text("Alarm: ${note.alarmTime?.let { Date(it) } ?: "Not set"}")
-                        if (mode != NoteMode.VIEW) Button(onClick = { viewModel.setAlarm(System.currentTimeMillis() + 60_000) }) { Text("Set +1 Min") }
+                        if (mode != NoteMode.VIEW) Button(onClick = { viewModel.setAlarm(System.currentTimeMillis() + 60_000) }) {
+                            Text(
+                                "Set +1 Min"
+                            )
+                        }
                     }
+
                     EditorTool.Checklist -> {
                         Text("Checklist")
                         note.checklistItems.forEachIndexed { index, item ->
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Checkbox(checked = item.isChecked, onCheckedChange = { if (mode != NoteMode.VIEW) viewModel.toggleChecklist(index) })
+                                Checkbox(
+                                    checked = item.isChecked,
+                                    onCheckedChange = {
+                                        if (mode != NoteMode.VIEW) viewModel.toggleChecklist(index)
+                                    })
                                 Text(item.text)
                             }
                         }
                         if (mode != NoteMode.VIEW) {
-                            OutlinedTextField(value = checklistInput, onValueChange = { checklistInput = it }, label = { Text("Checklist item") }, modifier = Modifier.fillMaxWidth())
-                            Button(onClick = { viewModel.addChecklist(checklistInput); checklistInput = "" }) { Text("Add checklist") }
+                            OutlinedTextField(
+                                value = checklistInput,
+                                onValueChange = { checklistInput = it },
+                                label = { Text("Checklist item") },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Button(onClick = {
+                                viewModel.addChecklist(checklistInput); checklistInput = ""
+                            }) { Text("Add checklist") }
                         }
                     }
+
                     EditorTool.Attachments -> {
                         Text("Images (${note.imageAttachments.size}/5)")
                         note.imageAttachments.forEach { path ->
-                            AsyncImage(model = Uri.parse(path), contentDescription = null, modifier = Modifier.fillMaxWidth().height(180.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
+                            AsyncImage(
+                                model = Uri.parse(path),
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(180.dp)
+                                    .clip(RoundedCornerShape(8.dp)),
+                                contentScale = ContentScale.Crop
+                            )
                         }
                         if (mode != NoteMode.VIEW) {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Button(onClick = { galleryLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) { Text("Gallery") }
-                                Button(onClick = { cameraPermissionLauncher.launch(Manifest.permission.CAMERA) }) { Text("Take Photo") }
+                                Button(onClick = {
+                                    galleryLauncher.launch(
+                                        PickVisualMediaRequest(
+                                            ActivityResultContracts.PickVisualMedia.ImageOnly
+                                        )
+                                    )
+                                }) { Text("Gallery") }
+                                Button(onClick = { cameraPermissionLauncher.launch(Manifest.permission.CAMERA) }) {
+                                    Text(
+                                        "Take Photo"
+                                    )
+                                }
                             }
                         }
                     }
+
                     EditorTool.Audio -> {
                         Text("Audio (${note.audioAttachments.size}/2)")
                         note.audioAttachments.forEach { audio ->
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                Text(text = audio.substringAfterLast('/'), modifier = Modifier.weight(1f))
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = audio.substringAfterLast('/'),
+                                    modifier = Modifier.weight(1f)
+                                )
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Button(onClick = { player.play(audio) }) { Text("Play") }
                                     Button(onClick = { player.stop() }) { Text("Stop") }
@@ -771,49 +1235,68 @@ fun NoteEditorScreen(viewModel: NoteEditorViewModel, onBack: () -> Unit) {
                             }) { Text(if (isRecording) "Stop & Save" else "Record") }
                         }
                     }
+
                     EditorTool.Canvas -> {
                         Text("Canvas")
                         Text(note.drawingImagePath ?: "No drawing saved")
                         if (mode != NoteMode.VIEW) {
                             Box(
-                                modifier = Modifier.fillMaxWidth().height(260.dp)
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(260.dp)
                                     .clip(RoundedCornerShape(8.dp))
-                                    .background(androidx.compose.ui.graphics.Color.White)
+                                    .background(Color.White)
                             ) {
-                                Canvas(modifier = Modifier.fillMaxSize().pointerInput(Unit) {
-                                    detectDragGestures(
-                                        onDragStart = { start ->
-                                            currentStroke = listOf(start)
-                                            strokes.add(currentStroke)
-                                        },
-                                        onDrag = { change, _ ->
-                                            if (strokes.isNotEmpty()) {
-                                                currentStroke = currentStroke + change.position
-                                                strokes[strokes.lastIndex] = currentStroke
+                                Canvas(modifier = Modifier
+                                    .fillMaxSize()
+                                    .pointerInput(Unit) {
+                                        detectDragGestures(
+                                            onDragStart = { start ->
+                                                currentStroke = listOf(start)
+                                                strokes.add(currentStroke)
+                                            },
+                                            onDrag = { change, _ ->
+                                                if (strokes.isNotEmpty()) {
+                                                    currentStroke = currentStroke + change.position
+                                                    strokes[strokes.lastIndex] = currentStroke
+                                                }
                                             }
-                                        }
-                                    )
-                                }) {
+                                        )
+                                    }) {
                                     strokes.forEach { stroke ->
                                         if (stroke.size > 1) {
                                             val path = Path().apply {
                                                 moveTo(stroke.first().x, stroke.first().y)
                                                 stroke.drop(1).forEach { lineTo(it.x, it.y) }
                                             }
-                                            drawPath(path, color = androidx.compose.ui.graphics.Color.Black, style = Stroke(width = 4f))
+                                            drawPath(
+                                                path,
+                                                color = Color.Black,
+                                                style = Stroke(width = 4f)
+                                            )
                                         }
                                     }
                                 }
-                            }) {
-                                Text(if (isRecording) "Stop & Save Recording" else "Record Audio")
+                            }
+                            Text(if (isRecording) "Stop & Save Recording" else "Record Audio")
+
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(onClick = { strokes.clear() }) { Text("Clear") }
+                                Button(onClick = {
+                                    saveDrawing(
+                                        context,
+                                        strokes
+                                    )?.let(viewModel::setDrawing)
+                                }) { Text("Save") }
                             }
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Button(onClick = { strokes.clear() }) { Text("Clear") }
-                                Button(onClick = { saveDrawing(context, strokes)?.let(viewModel::setDrawing) }) { Text("Save") }
-                            }
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Button(onClick = { strokes.clear() }) { Text("Clear") }
-                                Button(onClick = { saveDrawing(context, strokes)?.let(viewModel::setDrawing) }) { Text("Save") }
+                                Button(onClick = {
+                                    saveDrawing(
+                                        context,
+                                        strokes
+                                    )?.let(viewModel::setDrawing)
+                                }) { Text("Save") }
                             }
                         }
                     }
@@ -825,7 +1308,13 @@ fun NoteEditorScreen(viewModel: NoteEditorViewModel, onBack: () -> Unit) {
                 note.tableData.groupBy { it.row }.toSortedMap().forEach { (_, rowCells) ->
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         rowCells.sortedBy { it.column }.forEach { cell ->
-                            OutlinedTextField(value = cell.value, onValueChange = { viewModel.updateCell(cell.row, cell.column, it) }, enabled = mode != NoteMode.VIEW, label = { Text("${cell.row},${cell.column}") }, modifier = Modifier.weight(1f))
+                            OutlinedTextField(
+                                value = cell.value,
+                                onValueChange = { viewModel.updateCell(cell.row, cell.column, it) },
+                                enabled = mode != NoteMode.VIEW,
+                                label = { Text("${cell.row},${cell.column}") },
+                                modifier = Modifier.weight(1f)
+                            )
                         }
                     }
                 }
@@ -834,8 +1323,16 @@ fun NoteEditorScreen(viewModel: NoteEditorViewModel, onBack: () -> Unit) {
 
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedButton(onClick = { viewModel.delete(onBack) }) { Icon(Icons.Default.Delete, contentDescription = null); Text(" Delete") }
-                    Button(onClick = { viewModel.save(onBack) }, enabled = mode != NoteMode.VIEW) { Icon(Icons.Default.Check, contentDescription = null); Text(" Save") }
+                    OutlinedButton(onClick = { viewModel.delete(onBack) }) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = null
+                        ); Text(" Delete")
+                    }
+                    Button(
+                        onClick = { viewModel.save(onBack) },
+                        enabled = mode != NoteMode.VIEW
+                    ) { Icon(Icons.Default.Check, contentDescription = null); Text(" Save") }
                 }
             }
         }
@@ -848,14 +1345,21 @@ private fun saveBitmap(context: Context, bitmap: Bitmap): String? = runCatching 
     file.absolutePath
 }.getOrNull()
 
+@Composable
 private fun saveDrawing(context: Context, strokes: List<List<Offset>>): String? = runCatching {
     val width = 1200
     val height = 800
     val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+
+
     val canvas = android.graphics.Canvas(bitmap)
-    canvas.drawColor(Color.WHITE)
+
+
+
+    canvas.drawColor(MaterialTheme.colorScheme.background.toArgb())
+
     val paint = Paint().apply {
-        color = Color.BLACK
+        color = MaterialTheme.colorScheme.secondary.toArgb()
         strokeWidth = 6f
         style = Paint.Style.STROKE
         isAntiAlias = true
