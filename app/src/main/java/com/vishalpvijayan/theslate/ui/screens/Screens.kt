@@ -1280,12 +1280,17 @@ fun NoteEditorScreen(viewModel: NoteEditorViewModel, onBack: () -> Unit) {
                             }
                             Text(if (isRecording) "Stop & Save Recording" else "Record Audio")
 
+                            val drawingBackgroundColor = MaterialTheme.colorScheme.background.toArgb()
+                            val drawingStrokeColor = MaterialTheme.colorScheme.secondary.toArgb()
+
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Button(onClick = { strokes.clear() }) { Text("Clear") }
                                 Button(onClick = {
                                     saveDrawing(
-                                        context,
-                                        strokes
+                                        context = context,
+                                        strokes = strokes,
+                                        backgroundColor = drawingBackgroundColor,
+                                        strokeColor = drawingStrokeColor
                                     )?.let(viewModel::setDrawing)
                                 }) { Text("Save") }
                             }
@@ -1293,8 +1298,10 @@ fun NoteEditorScreen(viewModel: NoteEditorViewModel, onBack: () -> Unit) {
                                 Button(onClick = { strokes.clear() }) { Text("Clear") }
                                 Button(onClick = {
                                     saveDrawing(
-                                        context,
-                                        strokes
+                                        context = context,
+                                        strokes = strokes,
+                                        backgroundColor = drawingBackgroundColor,
+                                        strokeColor = drawingStrokeColor
                                     )?.let(viewModel::setDrawing)
                                 }) { Text("Save") }
                             }
@@ -1345,21 +1352,21 @@ private fun saveBitmap(context: Context, bitmap: Bitmap): String? = runCatching 
     file.absolutePath
 }.getOrNull()
 
-@Composable
-private fun saveDrawing(context: Context, strokes: List<List<Offset>>): String? = runCatching {
+private fun saveDrawing(
+    context: Context,
+    strokes: List<List<Offset>>,
+    backgroundColor: Int,
+    strokeColor: Int
+): String? = runCatching {
     val width = 1200
     val height = 800
     val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-
-
     val canvas = android.graphics.Canvas(bitmap)
 
-
-
-    canvas.drawColor(MaterialTheme.colorScheme.background.toArgb())
+    canvas.drawColor(backgroundColor)
 
     val paint = Paint().apply {
-        color = MaterialTheme.colorScheme.secondary.toArgb()
+        color = strokeColor
         strokeWidth = 6f
         style = Paint.Style.STROKE
         isAntiAlias = true
